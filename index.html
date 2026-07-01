@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luffi — Умное бронирование</title>
+    <!-- Подключаем библиотеку для генерации QR-кодов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* --- Сброс стилей и переменные --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            background: #f4f7fc;
+            color: #1a2634;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .app-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 20px 60px rgba(0, 20, 40, 0.08);
+            padding: 30px 35px;
+        }
+
+        /* --- Шапка --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #0b1e33;
+        }
+
+        .logo span {
+            color: #2a7de1;
+        }
+
+        .user-badge {
+            background: #eef4fe;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a4f8b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-badge::before {
+            content: "👤";
+            font-size: 16px;
+        }
+
+        /* --- Секция "Живая система" --- */
+        .live-system {
+            background: linear-gradient(145deg, #f0f5ff, #e8f0fe);
+            border-radius: 24px;
+            padding: 25px 30px;
+            margin-bottom: 40px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 6px solid #2a7de1;
+        }
+
+        .live-system .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .live-dot {
+            width: 14px;
+            height: 14px;
+            background: #22c55e;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0.6; transform: scale(0.95); }
+        }
+
+        .live-system .event {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-size: 14px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.02);
+        }
+
+        .live-system .event strong {
+            color: #0b1e33;
+        }
+
+        /* --- Сетка комнат --- */
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 24px;
+            margin: 30px 0 35px;
+        }
+
+        .room-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 22px 20px 20px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.02);
+            border: 1px solid #eef2f8;
+            transition: 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .room-card:hover {
+            border-color: #cbd8e9;
+            box-shadow: 0 12px 28px rgba(42, 125, 225, 0.08);
+            transform: translateY(-3px);
+        }
+
+        .room-card.free {
+            border-left: 6px solid #22c55e;
+        }
+
+        .room-card.busy {
+            border-left: 6px solid #f97316;
+        }
+
+        .room-card.booked {
+            border-left: 6px solid #3b82f6;
+            opacity: 0.8;
+        }
+
+        .room-name {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .room-meta {
+            font-size: 14px;
+            color: #5d6f83;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .room-status {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 40px;
+            background: #f1f5f9;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .room-status.free {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .room-status.busy {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .room-status.booked {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .room-action-btn {
+            margin-top: 10px;
+            padding: 10px 0;
+            background: #2a7de1;
+            border: none;
+            border-radius: 40px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.15s;
+            width: 100%;
+        }
+
+        .room-action-btn:hover {
+            background: #1a5fb0;
+        }
+
+        .room-action-btn:disabled {
+            background: #b0c7e0;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        /* --- Активные брони и аналитика --- */
+        .stats-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 40px 0 30px;
+            background: #f9fbfd;
+            border-radius: 24px;
+            padding: 25px 30px;
+        }
+
+        @media (max-width: 700px) {
+            .stats-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        .stats-block h3 {
+            font-size: 18px;
+            margin-bottom: 18px;
+            color: #1e2f40;
+        }
+
+        .booking-item {
+            background: white;
+            padding: 12px 18px;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e9eef4;
+            font-size: 14px;
+        }
+
+        .booking-item .room {
+            font-weight: 600;
+        }
+
+        .booking-item .time {
+            color: #5d6f83;
+        }
+
+        .ghost-badge {
+            background: #fef2f2;
+            color: #b91c1c;
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+
+        .progress-bar-bg {
+            background: #e9eef4;
+            border-radius: 40px;
+            height: 10px;
+            width: 100%;
+            margin: 8px 0;
+        }
+
+        .progress-bar-fill {
+            height: 10px;
+            border-radius: 40px;
+            background: #2a7de1;
+            width: 0%;
+        }
+
+        .room-load-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .room-load-item .name {
+            width: 130px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .room-load-item .value {
+            font-weight: 600;
+            font-size: 14px;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        /* --- QR-код --- */
+        .qr-section {
+            margin-top: 20px;
+            padding: 25px;
+            background: #f2f6fe;
+            border-radius: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 30px;
+            border: 1px dashed #2a7de1;
+        }
+
+        .qr-code-box {
+            background: white;
+            padding: 12px;
+            border-radius: 16px;
+            display: inline-block;
+        }
+
+        .qr-info {
+            flex: 1;
+        }
+
+        .qr-info .key {
+            font-family: monospace;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #0b1e33;
+        }
+
+        .timer {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2a7de1;
+        }
+
+        /* --- Адаптив --- */
+        @media (max-width: 600px) {
+            .app-container {
+                padding: 20px 15px;
+            }
+            .live-system {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        .footer-message {
+            margin-top: 25px;
+            font-size: 13px;
+            color: #6b7f94;
+            text-align: center;
+            border-top: 1px solid #e9eef4;
+            padding-top: 25px;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- Шапка -->
+    <header class="header">
+        <div class="logo">Luffi <span>✦</span></div>
+        <div class="user-badge">Алексей В.</div>
+    </header>
+
+    <!-- Живая система -->
+    <div class="live-system" id="liveSystem">
+        <div class="status">
+            <span class="live-dot"></span> Live · Система активна
+        </div>
+        <div class="event" id="liveEvent">
+            ✅ <strong>Алексей</strong> вошёл в Переговорную 3
+        </div>
+        <div style="font-size:14px; color:#4a6180;">Корпус А — 2 этаж</div>
+    </div>
+
+    <!-- Список комнат -->
+    <h2 style="font-size:22px; margin-bottom:10px;">Бронирование переговорных</h2>
+    <p style="color:#5d6f83; margin-bottom:20px;">Нажмите на свободную комнату, чтобы забронировать. Данные в браузере.</p>
+
+    <div class="rooms-grid" id="roomsGrid"></div>
+
+    <!-- Активные брони + Аналитика -->
+    <div class="stats-section">
+        <div class="stats-block">
+            <h3>📋 Активные брони</h3>
+            <div id="activeBookingsList">
+                <div style="color:#6b7f94; font-size:15px;">Нет активных броней</div>
+            </div>
+            <div style="display:flex; gap:20px; margin-top:16px; flex-wrap:wrap;">
+                <span style="background:#eef4fe; padding:5px 16px; border-radius:40px; font-size:14px;"><strong id="totalBookings">0</strong> броней сегодня</span>
+                <span style="background:#fef2f2; padding:5px 16px; border-radius:40px; font-size:14px;">👻 Призраков отменено: <strong id="ghostCount">0</strong></span>
+            </div>
+        </div>
+        <div class="stats-block">
+            <h3>📊 Загрузка по комнатам</h3>
+            <div id="loadStats"></div>
+            <div style="margin-top:16px; background:#eef4fe; padding:14px 18px; border-radius:16px;">
+                <span style="font-weight:700;" id="emptyPercent">42%</span> помещений пустуют при активных бронях
+            </div>
+        </div>
+    </div>
+
+    <!-- QR-код (активный) -->
+    <div class="qr-section" id="qrSection">
+        <div class="qr-code-box" id="qrCodeBox">
+            <div id="qrcode" style="width:120px; height:120px;"></div>
+        </div>
+        <div class="qr-info">
+            <div style="font-weight:600; font-size:18px;">Ваш цифровой ключ</div>
+            <div class="key" id="qrKeyDisplay">LF-2847-XK</div>
+            <div style="color:#4a6180; margin:8px 0;">Поднесите к считывателю или покажите охране</div>
+            <div class="timer" id="timerDisplay">⏱ Осталось времени: 58 мин</div>
+        </div>
+    </div>
+
+    <div class="footer-message">
+        ⚡ 15 мин — и бронь отменяется, если никто не пришёл • 30 сек на получение доступа
+    </div>
+</div>
+
+<script>
+    (function() {
+        // --- Данные комнат ---
+        const roomsData = [
+            { id: 1, name: 'Переговорная 1', floor: '2 этаж, корпус А', capacity: 6, status: 'free', bookedUntil: null, currentUser: null },
+            { id: 2, name: 'Переговорная 2', floor: '2 этаж, корпус А', capacity: 10, status: 'free', bookedUntil: null, currentUser: null },
+            { id: 3, name: 'Переговорная 3', floor: '3 этаж, корпус А', capacity: 4, status: 'free', bookedUntil: null, currentUser: null },
+            { id: 4, name: 'Переговорная 4', floor: '3 этаж, корпус А', capacity: 20, status: 'free', bookedUntil: null, currentUser: null },
+        ];
+
+        // --- Состояние ---
+        let bookings = []; // { roomId, userName, startTime, endTime, isGhost }
+        let ghostCount = 0;
+        let timerInterval = null;
+        let ghostCheckInterval = null;
+        let currentQrRoomId = null;
+
+        // --- DOM элементы ---
+        const roomsGrid = document.getElementById('roomsGrid');
+        const activeList = document.getElementById('activeBookingsList');
+        const totalBookingsSpan = document.getElementById('totalBookings');
+        const ghostCountSpan = document.getElementById('ghostCount');
+        const loadStatsDiv = document.getElementById('loadStats');
+        const emptyPercentSpan = document.getElementById('emptyPercent');
+        const qrCodeDiv = document.getElementById('qrcode');
+        const qrKeyDisplay = document.getElementById('qrKeyDisplay');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const liveEvent = document.getElementById('liveEvent');
+
+        // --- Вспомогательные функции ---
+        function generateKey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let key = 'LF-';
+            for (let i = 0; i < 8; i++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+                if (i === 3) key += '-';
+            }
+            return key;
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function getRoomById(id) {
+            return roomsData.find(r => r.id === id);
+        }
+
+        // --- Отрисовка комнат ---
+        function renderRooms() {
+            roomsGrid.innerHTML = '';
+            roomsData.forEach(room => {
+                const card = document.createElement('div');
+                card.className = `room-card ${room.status}`;
+
+                const isBooked = room.status === 'booked';
+                const isBusy = room.status === 'busy';
+                const isFree = room.status === 'free';
+
+                let statusText = 'Свободна';
+                let statusClass = 'free';
+                if (isBooked) { statusText = `Забронирована до ${room.bookedUntil ? formatTime(room.bookedUntil) : ''}`; statusClass = 'booked'; }
+                if (isBusy) { statusText = 'Занят · идёт занятие'; statusClass = 'busy'; }
+
+                card.innerHTML = `
+                    <div class="room-name">${room.name}</div>
+                    <div class="room-meta">
+                        <span>${room.floor}</span>
+                        <span>👥 до ${room.capacity} чел.</span>
+                    </div>
+                    <div class="room-status ${statusClass}">${statusText}</div>
+                    <button class="room-action-btn" data-room-id="${room.id}" ${!isFree ? 'disabled' : ''}>
+                        ${isFree ? '📅 Забронировать' : 'Занято'}
+                    </button>
+                `;
+                roomsGrid.appendChild(card);
+
+                // Обработчик кнопки
+                const btn = card.querySelector('.room-action-btn');
+                if (btn && !btn.disabled) {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const roomId = parseInt(btn.dataset.roomId);
+                        bookRoom(roomId);
+                    });
+                }
+            });
+        }
+
+        // --- Логика бронирования ---
+        function bookRoom(roomId) {
+            const room = getRoomById(roomId);
+            if (!room || room.status !== 'free') return;
+
+            const now = new Date();
+            const endTime = new Date(now.getTime() + 60 * 60 * 1000); // +1 час
+            const userName = 'Алексей В.';
+
+            // Создаем бронь
+            const booking = {
+                roomId: roomId,
+                userName: userName,
+                startTime: new Date(now),
+                endTime: endTime,
+                isGhost: false,
+            };
+            bookings.push(booking);
+
+            // Обновляем комнату
+            room.status = 'booked';
+            room.bookedUntil = endTime;
+            room.currentUser = userName;
+
+            // Обновляем QR
+            const key = generateKey();
+            qrKeyDisplay.textContent = key;
+            currentQrRoomId = roomId;
+            // Генерируем QR
+            qrCodeDiv.innerHTML = '';
+            new QRCode(qrCodeDiv, {
+                text: `LUFFI:${roomId}:${key}:${endTime.getTime()}`,
+                width: 120,
+                height: 120,
+                colorDark: '#0b1e33',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            // Обновляем таймер
+            updateTimer(endTime);
+
+            // Обновляем ленту
+            liveEvent.innerHTML = `✅ <strong>${userName}</strong> забронировал(а) <strong>${room.name}</strong>`;
+
+            // Перерисовываем
+            renderAll();
+
+            // Запускаем проверку на "призрака" через 15 секунд (для демо)
+            setTimeout(() => {
+                checkGhost(roomId);
+            }, 15000); // 15 секунд
+        }
+
+        // --- Проверка "комнаты-призрака" ---
+        function checkGhost(roomId) {
+            const room = getRoomById(roomId);
+            if (!room || room.status !== 'booked') return;
+
+            // Проверяем, есть ли активная бронь для этой комнаты
+            const bookingIndex = bookings.findIndex(b => b.roomId === roomId && !b.isGhost);
+            if (bookingIndex === -1) return;
+
+            // Имитация: если никто не пришел (в демо считаем что не пришли)
+            // В реальности тут был бы датчик, мы просто делаем авто-отмену
+            const booking = bookings[bookingIndex];
+            booking.isGhost = true;
+            ghostCount++;
+
+            // Освобождаем комнату
+            room.status = 'free';
+            room.bookedUntil = null;
+            room.currentUser = null;
+
+            // Удаляем бронь из списка (помечаем как призрака)
+            // Оставляем в массиве для статистики, но не показываем в активных
+
+            // Обновляем ленту
+            liveEvent.innerHTML = `👻 <strong>${room.name}</strong> пустует — бронь отменена автоматически`;
+
+            // Обновляем QR (показываем, что ключ неактивен)
+            qrKeyDisplay.textContent = '❌ Неактивен';
+            qrCodeDiv.innerHTML = '';
+            timerDisplay.textContent = '⏱ Бронь отменена';
+
+            renderAll();
+        }
+
+        // --- Таймер ---
+        function updateTimer(endTime) {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = Math.max(0, Math.floor((endTime - now) / 60000));
+                if (diff <= 0) {
+                    timerDisplay.textContent = '⏱ Время истекло';
+                    clearInterval(timerInterval);
+                    // Освободить комнату
+                    if (currentQrRoomId) {
+                        const room = getRoomById(currentQrRoomId);
+                        if (room && room.status === 'booked') {
+                            room.status = 'free';
+                            room.bookedUntil = null;
+                            room.currentUser = null;
+                            // Удалить бронь
+                            bookings = bookings.filter(b => b.roomId !== currentQrRoomId || b.isGhost);
+                            renderAll();
+                            liveEvent.innerHTML = `⏹ <strong>${room.name}</strong> освободилась автоматически`;
+                        }
+                    }
+                } else {
+                    timerDisplay.textContent = `⏱ Осталось времени: ${diff} мин`;
+                }
+            }, 10000);
+        }
+
+        // --- Рендер активных броней ---
+        function renderActiveBookings() {
+            const active = bookings.filter(b => !b.isGhost);
+            if (active.length === 0) {
+                activeList.innerHTML = '<div style="color:#6b7f94; font-size:15px;">Нет активных броней</div>';
+            } else {
+                activeList.innerHTML = active.map(b => {
+                    const room = getRoomById(b.roomId);
+                    return `<div class="booking-item">
+                        <span class="room">${room ? room.name : 'Комната'}</span>
+                        <span class="time">${formatTime(b.startTime)} — ${formatTime(b.endTime)}</span>
+                        <span style="font-size:13px; color:#2a7de1;">${b.userName}</span>
+                    </div>`;
+                }).join('');
+            }
+            totalBookingsSpan.textContent = bookings.length;
+            ghostCountSpan.textContent = ghostCount;
+        }
+
+        // --- Рендер загрузки ---
+        function renderLoadStats() {
+            let totalCapacity = 0;
+            let usedCapacity = 0;
+            let roomLoadHtml = '';
+
+            roomsData.forEach(room => {
+                const isBusy = room.status === 'busy' || room.status === 'booked';
+                const loadPercent = isBusy ? 100 : 0;
+                totalCapacity += room.capacity;
+                if (isBusy) usedCapacity += room.capacity;
+
+                roomLoadHtml += `
+                    <div class="room-load-item">
+                        <span class="name">${room.name}</span>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${loadPercent}%;"></div></div>
+                        <span class="value">${loadPercent}%</span>
+                    </div>
+                `;
+            });
+
+            loadStatsDiv.innerHTML = roomLoadHtml;
+
+            const emptyPercent = totalCapacity > 0 ? Math.round((1 - usedCapacity / totalCapacity) * 100) : 0;
+            emptyPercentSpan.textContent = emptyPercent + '%';
+        }
+
+        // --- Общий рендер ---
+        function renderAll() {
+            renderRooms();
+            renderActiveBookings();
+            renderLoadStats();
+        }
+
+        // --- Инициализация ---
+        function init() {
+            // Стартовый QR
+            const defaultKey = 'LF-2847-XK';
+            qrKeyDisplay.textContent = defaultKey;
+            new QRCode(qrCodeDiv, {
+                text: 'LUFFI:DEFAULT:KEY',
+                width: 120,
+                height: 120,
+                colorDark: '#0b1e33',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            timerDisplay.textContent = '⏱ Осталось времени: 58 мин';
+
+            // Добавим одну тестовую "живую" активность
+            setTimeout(() => {
+                liveEvent.innerHTML = '✅ <strong>Алексей</strong> вошёл в Переговорную 3';
+            }, 100);
+
+            renderAll();
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
